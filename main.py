@@ -106,6 +106,7 @@ def open_chrome():
     # 指定chrome浏览器使用的用户配置文件目录，实现先登录然后再次打开就已经是登录状态
     chrome_user_data_path = read_config('chrome_user_data_path')  # 从配置文件中读取chrome的用户配置文件路径
     chrome_options.add_argument(f'--user-data-dir={chrome_user_data_path}')
+    # chrome_options.add_argument('--headless')
     # chrome_options.add_argument(r'--user-data-dir=C:\Users\YUYONG\AppData\Local\Google\Chrome\User Data')
     # 禁止打印一些无关的日志
     chrome_options.add_experimental_option("excludeSwitches", ['enable-automation', 'enable-logging'])
@@ -131,6 +132,8 @@ def get_page_data(driver):
 
     # 定位方式
     path_xpath = "xpath"
+    # 生成的CSV文件中是否有 Usage Start Date 字段为空的行
+    usage_start_date = False
 
     year, month = get_year_and_month_of_last_month()
     bill_page_url = f'https://console.aws.amazon.com/billing/home?region=ap-northeast-2#/bills?year={year}&month={month}'
@@ -147,13 +150,13 @@ def get_page_data(driver):
     # 切换到按账号展示的账单tab页
     path_account_view_tab = '//*[@id="bills-page-antelope"]/div[6]/div/div/div/div[1]/div[2]/awsui-tabs/div/ul/li[2]/a'
     driver.find_element(by=path_xpath, value=path_account_view_tab).click()
-    sleep(0.5)
+    # sleep(0.5)
 
     # 写入CSV文件的表头
     header_line = ['InvoiceID', 'PayerAccountId', 'LinkedAccountId', 'RecordType', 'RecordID', 'BillingPeriodStartDate',
                    'BillingPeriodEndDate', 'InvoiceDate', 'PayerAccountName', 'LinkedAccountName', 'TaxationAddress',
                    'PayerPONumber', 'ProductCode', 'ProductName', 'SellerOfRecord', 'UsageType', 'Operation', 'RateId',
-                   'ItemDescription', 'UsageStartDate', 'UsageEndDate', 'UsageQuantity', 'BlendedRate', 'CurrencyCode',
+                   'ItemDescription', 'usage_start_date', 'UsageEndDate', 'UsageQuantity', 'BlendedRate', 'CurrencyCode',
                    'CostBeforeTax', 'Credits', 'TaxAmount', 'TaxType', 'TotalCost'
                    ]
     write_new_csv(header_line)
@@ -182,10 +185,10 @@ def get_page_data(driver):
         account = accounts[i]
         # 元素移动到页面可视区域，否则不能操作
         ele_scroll_to_view(driver, account)
-        sleep(0.5)
+        # sleep(0.5)
         # try:
         account.click()
-        sleep(1)
+        # sleep(1)
         path_account_number = f'{path_accounts}[{i + 1}]/awsui-expandable-section/h3'
         account_number = driver.find_element(by=path_xpath, value=path_account_number).text[-13:-1]
         # 用户账号加入列表
@@ -248,7 +251,7 @@ def get_page_data(driver):
             for m in range(1, len(regions) + 1):
                 region = regions[m - 1]
                 ele_scroll_to_view(driver, region)
-                sleep(0.5)
+                # sleep(0.5)
                 # 获取region的名称
                 path_region_name = f'{path_regions}[{m}]/awsui-expandable-section/h3'
                 region_name = driver.find_element(by=path_xpath, value=path_region_name).text
@@ -263,18 +266,18 @@ def get_page_data(driver):
                 print(f'第 {m} 个 region fee is {region_fee}')
                 # 展开区域下明细类型
                 region.click()
-                sleep(1)
+                # sleep(1)
                 path_detail_types = f'{path_region_name}/../div/span/div/div'
                 detail_types = driver.find_elements(by=path_xpath, value=path_detail_types)
-                print(f'{len(detail_types)} types of details')
+                # print(f'{len(detail_types)} types of details')
                 for n in range(1, len(detail_types) + 1):
-                    detil_type = detail_types[n - 1]
-                    ele_scroll_to_view(driver, detil_type)
+                    detail_type = detail_types[n - 1]
+                    ele_scroll_to_view(driver, detail_type)
                     # sleep(0.5)
                     # 用量详情的路径
                     path_details = f'{path_detail_types}[{n}]/div'
                     details = driver.find_elements(by=path_xpath, value=path_details)
-                    print(f'第 {n} 个类型下有{len(details) - 1}条明细')
+                    # print(f'第 {n} 个类型下有{len(details) - 1}条明细')
                     for r in range(1, len(details)):
                         data_item_final = []
                         data_item_final.extend(data_item_product)
@@ -289,25 +292,37 @@ def get_page_data(driver):
                         data_item_final.append(detail_item_text)
                         detail_fee = re.sub(r'[$,]*', '',
                                             driver.find_element(by=path_xpath, value=path_detail_fee).text)
-                        # 加入9个空值
-                        # 有改动
+                        # 扣税之前的金额，税额，明细最终金额 加入列表
+                        # 海外账号 税额都是0，所以扣税之前金额和明细最终金额相同
                         data_item_final.extend(['', '', '', '', '', detail_fee, '', '0', '', detail_fee])
-                        # detail_fee = driver.find_element(by=path_xpath, value=path_detail_fee).text.replace('$', '')
-
-                        # print(f'detail fee is: {detail_fee}')
-                        # 明细的费用加入列表
-                        # data_item_final.append(detail_fee)
+                        # 从aws原始的csv文件中匹配account 和 item description，取 Usage Start Date的值，页面上没有
+                        rows = read_aws_csv()
+                        # print(f'aws 原始的csv文件中数据行数（不算表头）：{len(rows)}')
+                        for row in rows:
+                            # print('匹配aws的csv文件中的item description，获取Usage Start Date的值')
+                            # aws的csv中item description文本内容中间可能会多空格，连续两个空格，正则将多个空格替换为一个
+                            # 如果aws中有重复的项，那么取第一匹配到的值
+                            # 目前还存在匹配不上的值，由姜玲手动处理
+                            item_description_aws = re.sub(' +', '', row[18])
+                            item_description_page = re.sub(' +', '', data_item_final[18])
+                            if row[2] == data_item_final[2] and item_description_aws == item_description_page:
+                                data_item_final[19] = row[19]
+                        if data_item_final[19] == '':
+                            usage_start_date = True
+                        # 明细内容写入csv
                         write_csv(data_item_final)
                         # print(data_item_final)
         # 账号合计的费用加入列表
         data_account_total.append(account_fee_total)
         write_csv(data_account_total)
-        # print(data_account_total)
-
         end_text = f'{account_number} end'
         print(f'{end_text:*^50}\n')
         # break
-        sleep(1)
+        # sleep(1)
+    if usage_start_date:
+        print('Warning：存在Usage Start Date 字段为空的行，请手动检查，并对比aws原始的csv进行补充！！！\n')
+    else:
+        print('INFO：所有明细的 Usage Start Date 字段已经补充完毕！\n')
     driver.quit()
 
 
@@ -329,25 +344,43 @@ def write_new_csv(data):
         writer.writerow(data)
 
 
+def read_aws_csv():
+    year, month = get_year_and_month_of_last_month()
+    dir_path = current_file_path()
+    path = f'{dir_path}/ecsv_{month}_{year}.csv'
+    try:
+        with open(path, 'r') as csv_file:
+            reader = csv.reader(csv_file)
+            next(reader)
+            csv_data = []
+            for row in reader:
+                csv_data.append(row)
+        return csv_data
+    except FileNotFoundError as e:
+        print(f'ERR: csv文件未找到{path}')
+        raise FileNotFoundError(e)
+
+
 def current_file_path():
     # return os.path.dirname(os.path.abspath(__file__))
     return os.path.dirname(sys.argv[0])
 
 
 if __name__ == '__main__':
-    # TODO: 写部署配置流程及操作手册
+    # TODO: 添加account total 与明细金额之和的校验，不符合给出提示
+    # TODO：添加对页面主要结构的校验，不符合给出提示
     try:
         clear_chrome()
         browser_driver = open_chrome()
         get_page_data(browser_driver)
     except LoginException as e:
-        print(f'ERR: {e}')
+        print(f'ERR: {e}\n')
     except Exception as e:
         if 'Message: chrome not reachable' in str(e):
-            print('ERR: 脚本运行中 chrome 浏览器被人为关闭!!! 脚本找不到chrome浏览器！！！')
+            print('ERR: 脚本运行中 chrome 浏览器被人为关闭!!! 脚本找不到chrome浏览器！！！\n')
         else:
-            print(f'ERR: {e}')
-        clear_chrome()
+            print(f'ERR: {e}\n')
+        # clear_chrome()
         sleep(1)
         print(f'ERR: 运行失败，请重新运行脚本！\n')
     else:
