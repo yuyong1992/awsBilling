@@ -1,4 +1,5 @@
 # coding:utf-8
+import decimal
 from selenium import webdriver
 # from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -135,6 +136,11 @@ def get_page_data(driver):
     # 生成的CSV文件中是否有 Usage Start Date 字段为空的行
     usage_start_date = False
 
+    # 各个账号之下区域费用之和，与 账号明细之和 对比，用来校验明细或者区域是否有缺失
+    all_account_total = decimal.Decimal('0')
+    # 账号明细费用之和
+    all_detail_total = decimal.Decimal('0')
+
     year, month = get_year_and_month_of_last_month()
     bill_page_url = f'https://console.aws.amazon.com/billing/home?region=ap-northeast-2#/bills?year={year}&month={month}'
     driver.get(bill_page_url)
@@ -156,7 +162,8 @@ def get_page_data(driver):
     header_line = ['InvoiceID', 'PayerAccountId', 'LinkedAccountId', 'RecordType', 'RecordID', 'BillingPeriodStartDate',
                    'BillingPeriodEndDate', 'InvoiceDate', 'PayerAccountName', 'LinkedAccountName', 'TaxationAddress',
                    'PayerPONumber', 'ProductCode', 'ProductName', 'SellerOfRecord', 'UsageType', 'Operation', 'RateId',
-                   'ItemDescription', 'usage_start_date', 'UsageEndDate', 'UsageQuantity', 'BlendedRate', 'CurrencyCode',
+                   'ItemDescription', 'usage_start_date', 'UsageEndDate', 'UsageQuantity', 'BlendedRate',
+                   'CurrencyCode',
                    'CostBeforeTax', 'Credits', 'TaxAmount', 'TaxType', 'TotalCost'
                    ]
     write_new_csv(header_line)
@@ -216,7 +223,7 @@ def get_page_data(driver):
         print(f'{start_text:*^50}')
 
         # 当前账号合计的费用
-        account_fee_total = 0
+        account_fee_total = decimal.Decimal(0)
 
         # 遍历账号下产品列表
         # 从第二个div开始，第一个div是标题
@@ -261,8 +268,7 @@ def get_page_data(driver):
                 # region_fee = driver.find_element(by=path_xpath, value=path_region_fee).text.replace('$', '')
                 region_fee = re.sub(r'[$,]*', '', driver.find_element(by=path_xpath, value=path_region_fee).text)
                 # 账号合计费用
-                account_fee_total = account_fee_total + float(region_fee)
-
+                account_fee_total = account_fee_total + decimal.Decimal(region_fee)
                 print(f'第 {m} 个 region fee is {region_fee}')
                 # 展开区域下明细类型
                 region.click()
@@ -290,11 +296,16 @@ def get_page_data(driver):
                         # print(f'detail is: {detail_item_text}')
                         # 明细的描述加入列表
                         data_item_final.append(detail_item_text)
+                        # 明细金额的文本
                         detail_fee = re.sub(r'[$,]*', '',
                                             driver.find_element(by=path_xpath, value=path_detail_fee).text)
+                        # 明细金额的数字
+                        # detail_fee_num = float(detail_fee)
+                        all_detail_total = all_detail_total + decimal.Decimal(detail_fee)
+
                         # 扣税之前的金额，税额，明细最终金额 加入列表
                         # 海外账号 税额都是0，所以扣税之前金额和明细最终金额相同
-                        data_item_final.extend(['', '', '', '', '', detail_fee, '', '0', '', detail_fee])
+                        data_item_final.extend(['', '', '', '', '', str(detail_fee), '', '0', '', str(detail_fee)])
                         # 从aws原始的csv文件中匹配account 和 item description，取 Usage Start Date的值，页面上没有
                         rows = read_aws_csv()
                         # print(f'aws 原始的csv文件中数据行数（不算表头）：{len(rows)}')
@@ -313,16 +324,24 @@ def get_page_data(driver):
                         write_csv(data_item_final)
                         # print(data_item_final)
         # 账号合计的费用加入列表
-        data_account_total.append(account_fee_total)
+        data_account_total.append(str(account_fee_total))
+        all_account_total = all_account_total + account_fee_total
+        # print(f'all_account_total: {all_account_total}')
         write_csv(data_account_total)
         end_text = f'{account_number} end'
         print(f'{end_text:*^50}\n')
         # break
         # sleep(1)
-    if usage_start_date:
-        print('Warning：存在Usage Start Date 字段为空的行，请手动检查，并对比aws原始的csv进行补充！！！\n')
+    # print(f'all_account_total: {all_account_total} -> all_detail_total:{all_detail_total}')
+    if all_account_total == all_detail_total:
+        if usage_start_date:
+            print('Warning：存在Usage Start Date 字段为空的行，请手动检查，并对比aws原始的csv进行补充！！！\n')
+        else:
+            print('INFO：所有明细的 Usage Start Date 字段已经补充完毕！\n')
     else:
-        print('INFO：所有明细的 Usage Start Date 字段已经补充完毕！\n')
+        # remove_csv()
+        # print('ERR: 金额校验不通过，获取到的明细可能有缺失，已删除生成的csv，请重新运行脚本。')
+        raise Exception('金额校验不通过，获取到的明细可能有缺失，已删除生成的csv，请重新运行脚本。')
     driver.quit()
 
 
@@ -366,9 +385,17 @@ def current_file_path():
     return os.path.dirname(sys.argv[0])
 
 
+def remove_csv():
+    year, month = get_year_and_month_of_last_month()
+    dir_path = current_file_path()
+    path = f'{dir_path}/aws_bill_{year}_{month}.csv'
+    if os.path.exists(path):
+        os.remove(path)
+
+
 if __name__ == '__main__':
-    # TODO: 添加account total 与明细金额之和的校验，不符合给出提示
     # TODO：添加对页面主要结构的校验，不符合给出提示
+    # start = time.time()
     try:
         clear_chrome()
         browser_driver = open_chrome()
@@ -376,14 +403,19 @@ if __name__ == '__main__':
     except LoginException as e:
         print(f'ERR: {e}\n')
     except Exception as e:
-        if 'Message: chrome not reachable' in str(e):
+        if 'Message: chrome not reachable' in str(e) or 'Message: no such window' in str(e):
             print('ERR: 脚本运行中 chrome 浏览器被人为关闭!!! 脚本找不到chrome浏览器！！！\n')
+        # elif 'no such window: window was already closed' in str(e):
+        #     print()
         else:
             print(f'ERR: {e}\n')
-        # clear_chrome()
-        sleep(1)
+        # 脚本运行失败，删除生成的csv
+        remove_csv()
         print(f'ERR: 运行失败，请重新运行脚本！\n')
     else:
         print('脚本执行成功！\n')
     finally:
+        # end = time.time()
+        # print(f'脚本用时：{end - start}')
         input('按Enter键退出窗口...\n')
+
