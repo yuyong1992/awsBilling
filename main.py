@@ -162,7 +162,7 @@ def get_page_data(driver):
     header_line = ['InvoiceID', 'PayerAccountId', 'LinkedAccountId', 'RecordType', 'RecordID', 'BillingPeriodStartDate',
                    'BillingPeriodEndDate', 'InvoiceDate', 'PayerAccountName', 'LinkedAccountName', 'TaxationAddress',
                    'PayerPONumber', 'ProductCode', 'ProductName', 'SellerOfRecord', 'UsageType', 'Operation', 'RateId',
-                   'ItemDescription', 'usage_start_date', 'UsageEndDate', 'UsageQuantity', 'BlendedRate',
+                   'ItemDescription', 'UsageStartDate', 'UsageEndDate', 'UsageQuantity', 'BlendedRate',
                    'CurrencyCode',
                    'CostBeforeTax', 'Credits', 'TaxAmount', 'TaxType', 'TotalCost'
                    ]
@@ -195,7 +195,7 @@ def get_page_data(driver):
         # sleep(0.5)
         # try:
         account.click()
-        # sleep(1)
+        sleep(0.5)
         path_account_number = f'{path_accounts}[{i + 1}]/awsui-expandable-section/h3'
         account_number = driver.find_element(by=path_xpath, value=path_account_number).text[-13:-1]
         # 用户账号加入列表
@@ -259,6 +259,8 @@ def get_page_data(driver):
                 region = regions[m - 1]
                 ele_scroll_to_view(driver, region)
                 # sleep(0.5)
+                ele_scroll_to_view(driver, region)
+                # sleep(0.5)
                 # 获取region的名称
                 path_region_name = f'{path_regions}[{m}]/awsui-expandable-section/h3'
                 region_name = driver.find_element(by=path_xpath, value=path_region_name).text
@@ -272,7 +274,7 @@ def get_page_data(driver):
                 print(f'第 {m} 个 region fee is {region_fee}')
                 # 展开区域下明细类型
                 region.click()
-                # sleep(1)
+                # sleep(0.5)
                 path_detail_types = f'{path_region_name}/../div/span/div/div'
                 detail_types = driver.find_elements(by=path_xpath, value=path_detail_types)
                 # print(f'{len(detail_types)} types of details')
@@ -332,7 +334,6 @@ def get_page_data(driver):
         print(f'{end_text:*^50}\n')
         # break
         # sleep(1)
-    # print(f'all_account_total: {all_account_total} -> all_detail_total:{all_detail_total}')
     if all_account_total == all_detail_total:
         if usage_start_date:
             print('Warning：存在Usage Start Date 字段为空的行，请手动检查，并对比aws原始的csv进行补充！！！\n')
@@ -341,7 +342,8 @@ def get_page_data(driver):
     else:
         # remove_csv()
         # print('ERR: 金额校验不通过，获取到的明细可能有缺失，已删除生成的csv，请重新运行脚本。')
-        raise Exception('金额校验不通过，获取到的明细可能有缺失，已删除生成的csv，请重新运行脚本。')
+        print(f'all_account_total: {all_account_total} -> all_detail_total:{all_detail_total}')
+        raise Exception('金额校验不通过，获取到的明细可能有缺失，请检查csv结果后重新运行脚本。')
     driver.quit()
 
 
@@ -405,12 +407,10 @@ if __name__ == '__main__':
     except Exception as e:
         if 'Message: chrome not reachable' in str(e) or 'Message: no such window' in str(e):
             print('ERR: 脚本运行中 chrome 浏览器被人为关闭!!! 脚本找不到chrome浏览器！！！\n')
-        # elif 'no such window: window was already closed' in str(e):
-        #     print()
         else:
             print(f'ERR: {e}\n')
-        # 脚本运行失败，删除生成的csv
-        remove_csv()
+        # # 脚本运行失败，删除生成的csv
+        # remove_csv()
         print(f'ERR: 运行失败，请重新运行脚本！\n')
     else:
         print('脚本执行成功！\n')
