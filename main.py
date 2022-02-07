@@ -84,6 +84,22 @@ def ele_scroll_to_view(driver, ele):
     :param ele: 要移动的元素
     """
     js = "arguments[0].scrollIntoView();"
+    # 默认是元素顶部与窗口顶部平齐；false指元素底部与窗口底部平齐
+    driver.execute_script(js, ele)
+    # 防止底部有遮挡，再向上移动100像素
+    js_extra = "window.scrollBy(0, -50)"
+    driver.execute_script(js_extra)
+
+
+def ele_scroll_to_view_needed(driver, ele):
+    """
+    scrollIntoViewIfNeeded(alignCenter) 只在当前元素在视窗的可见范围内不可见的情况下，才滚动浏览器窗口或容器元素，最终让当前元素可见。
+    如果当前元素在视窗中可见，这个方法不做任何处理。如果将可选参数alignCenter设置为true，则表示尽量将元素显示在视窗中部（垂直方向）
+    ------Safari、Chrome实现了这个方法
+
+    :return:
+    """
+    js = "arguments[0].scrollIntoViewIfNeeded();"
     driver.execute_script(js, ele)
 
 
@@ -259,8 +275,6 @@ def get_page_data(driver):
                 region = regions[m - 1]
                 ele_scroll_to_view(driver, region)
                 # sleep(0.5)
-                ele_scroll_to_view(driver, region)
-                # sleep(0.5)
                 # 获取region的名称
                 path_region_name = f'{path_regions}[{m}]/awsui-expandable-section/h3'
                 region_name = driver.find_element(by=path_xpath, value=path_region_name).text
@@ -274,7 +288,7 @@ def get_page_data(driver):
                 print(f'第 {m} 个 region fee is {region_fee}')
                 # 展开区域下明细类型
                 region.click()
-                # sleep(0.5)
+                # sleep(1)
                 path_detail_types = f'{path_region_name}/../div/span/div/div'
                 detail_types = driver.find_elements(by=path_xpath, value=path_detail_types)
                 # print(f'{len(detail_types)} types of details')
@@ -315,13 +329,16 @@ def get_page_data(driver):
                             # print('匹配aws的csv文件中的item description，获取Usage Start Date的值')
                             # aws的csv中item description文本内容中间可能会多空格，连续两个空格，正则将多个空格替换为一个
                             # 如果aws中有重复的项，那么取第一匹配到的值
-                            # 目前还存在匹配不上的值，由姜玲手动处理
+                            # 目前还存在匹配不上的值，由姜玲手动处理 -> 不手动处理了，改为取：BillingPeriodStartDate、BillingPeriodEndDate
                             item_description_aws = re.sub(' +', '', row[18])
                             item_description_page = re.sub(' +', '', data_item_final[18])
                             if row[2] == data_item_final[2] and item_description_aws == item_description_page:
+                                data_item_final[0] = row[0]
                                 data_item_final[19] = row[19]
+                                data_item_final[20] = row[20]
                         if data_item_final[19] == '':
-                            usage_start_date = True
+                            data_item_final[19] = data_item_final[5]
+                            data_item_final[20] = data_item_final[6]
                         # 明细内容写入csv
                         write_csv(data_item_final)
                         # print(data_item_final)
@@ -341,9 +358,9 @@ def get_page_data(driver):
             print('INFO：所有明细的 Usage Start Date 字段已经补充完毕！\n')
     else:
         # remove_csv()
-        # print('ERR: 金额校验不通过，获取到的明细可能有缺失，已删除生成的csv，请重新运行脚本。')
         print(f'all_account_total: {all_account_total} -> all_detail_total:{all_detail_total}')
-        raise Exception('金额校验不通过，获取到的明细可能有缺失，请检查csv结果后重新运行脚本。')
+        print('Warning: 金额校验不通过，获取到的明细可能有缺失\n')
+        # raise Exception('金额校验不通过，获取到的明细可能有缺失。')
     driver.quit()
 
 
@@ -367,6 +384,7 @@ def write_new_csv(data):
 
 def read_aws_csv():
     year, month = get_year_and_month_of_last_month()
+    month = month.lstrip('0')
     dir_path = current_file_path()
     path = f'{dir_path}/ecsv_{month}_{year}.csv'
     try:
@@ -418,4 +436,3 @@ if __name__ == '__main__':
         # end = time.time()
         # print(f'脚本用时：{end - start}')
         input('按Enter键退出窗口...\n')
-
