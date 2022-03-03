@@ -241,107 +241,114 @@ def get_page_data(driver):
         # 当前账号合计的费用
         account_fee_total = decimal.Decimal(0)
 
-        # 遍历账号下产品列表
-        # 从第二个div开始，第一个div是标题
-        path_products = f'//*[@id="bills-page-antelope"]/div[6]/div/div/div/div[1]/div[2]/awsui-tabs/div/div/div/span/div[2]/div/div/div/div[{i + 1}]/awsui-expandable-section/div/span/div/div/div/div'
-        products = driver.find_elements(by=path_xpath, value=path_products)
-        print(f'账号下下有 {len(products) - 1} 个 产品元素')
-        for j in range(1, len(products)):
-            print(f'第{j}个产品')
-            data_item_product = []
-            data_item_product.extend(data_item)
-            product = products[j]
-            ele_scroll_to_view(driver, product)
-            # sleep(0.5)
-            # 展开产品详情
-            product.click()
-            # sleep(0.5)
-            # 获取产品名称
-            path_product_name = f'{path_products}[{j + 1}]/awsui-expandable-section/h3'
-            product_name = driver.find_element(by=path_xpath, value=path_product_name).text
-            print(product_name)
-            # 产品简称和产品名称加入列表
-            data_item_product.extend([product_name, product_name])
-            # 销售公司名称加入明细的列表
-            data_item_product.append('Amazon Web Services, Inc.')
-            # 加入3个空格到明细的列表
-            data_item_product.extend(['', '', ''])
-
-            # 当前产品下区域的列表
-            path_regions = f'{path_products}[{j + 1}]/awsui-expandable-section/div/span/div[@ng-if="vm.shouldShowProducts(product)"]'
-            regions = driver.find_elements(by=path_xpath, value=path_regions)
-            print(f'第 {j} 个产品下有 {len(regions)} 个 region元素')
-            for m in range(1, len(regions) + 1):
-                region = regions[m - 1]
-                ele_scroll_to_view(driver, region)
+        # 账号下服务的类型：AWS 服务费用、AWS Marketplace 费用
+        path_fei_type = f'//*[@id="bills-page-antelope"]/div[6]/div/div/div/div[1]/div[2]/awsui-tabs/div/div/div/span/div[2]/div/div/div/div[{i + 1}]/awsui-expandable-section/div/span/div/div/div'
+        fei_types = driver.find_elements(by=path_xpath, value=path_fei_type)
+        print(f'账号下有 {len(fei_types)} 种费用类型')
+        for k in range(0, len(fei_types)):
+            # 遍历账号下产品列表
+            # 从第二个div开始，第一个div是标题
+            # path_products = f'//*[@id="bills-page-antelope"]/div[6]/div/div/div/div[1]/div[2]/awsui-tabs/div/div/div/span/div[2]/div/div/div/div[{i + 1}]/awsui-expandable-section/div/span/div/div/div/div'
+            path_products = f'{path_fei_type}[{k+1}]/div'
+            products = driver.find_elements(by=path_xpath, value=path_products)
+            print(f'第 {k+1} 个费用类型下有 {len(products) - 1} 个 产品元素')
+            for j in range(1, len(products)):
+                print(f'第{j}个产品')
+                data_item_product = []
+                data_item_product.extend(data_item)
+                product = products[j]
+                ele_scroll_to_view(driver, product)
                 # sleep(0.5)
-                # 获取region的名称
-                path_region_name = f'{path_regions}[{m}]/awsui-expandable-section/h3'
-                region_name = driver.find_element(by=path_xpath, value=path_region_name).text
-                print(f'第 {m} 个 region name is {region_name}')
-                # 获取regin的费用
-                path_region_fee = f'{path_regions}[{m}]/span'
-                # region_fee = driver.find_element(by=path_xpath, value=path_region_fee).text.replace('$', '')
-                region_fee = re.sub(r'[$,]*', '', driver.find_element(by=path_xpath, value=path_region_fee).text)
-                # 账号合计费用
-                account_fee_total = account_fee_total + decimal.Decimal(region_fee)
-                print(f'第 {m} 个 region fee is {region_fee}')
-                # 展开区域下明细类型
-                region.click()
-                # sleep(1)
-                path_detail_types = f'{path_region_name}/../div/span/div/div'
-                detail_types = driver.find_elements(by=path_xpath, value=path_detail_types)
-                # print(f'{len(detail_types)} types of details')
-                for n in range(1, len(detail_types) + 1):
-                    detail_type = detail_types[n - 1]
-                    ele_scroll_to_view(driver, detail_type)
-                    # sleep(0.5)
-                    # 用量详情的路径
-                    path_details = f'{path_detail_types}[{n}]/div'
-                    details = driver.find_elements(by=path_xpath, value=path_details)
-                    # print(f'第 {n} 个类型下有{len(details) - 1}条明细')
-                    for r in range(1, len(details)):
-                        data_item_final = []
-                        data_item_final.extend(data_item_product)
-                        path_detail_item = f'{path_details}[{r + 1}]/div[1]'
-                        path_detail_fee = f'{path_details}[{r + 1}]/div[3]'
-                        detail_item = driver.find_element(by=path_xpath, value=path_detail_item)
-                        # 元素移动到可视区域
-                        ele_scroll_to_view(driver, detail_item)
-                        detail_item_text = detail_item.text
-                        # print(f'detail is: {detail_item_text}')
-                        # 明细的描述加入列表
-                        data_item_final.append(detail_item_text)
-                        # 明细金额的文本
-                        detail_fee = re.sub(r'[$,]*', '',
-                                            driver.find_element(by=path_xpath, value=path_detail_fee).text)
-                        # 明细金额的数字
-                        # detail_fee_num = float(detail_fee)
-                        all_detail_total = all_detail_total + decimal.Decimal(detail_fee)
+                # 展开产品详情
+                product.click()
+                # sleep(0.5)
+                # 获取产品名称
+                path_product_name = f'{path_products}[{j + 1}]/awsui-expandable-section/h3'
+                product_name = driver.find_element(by=path_xpath, value=path_product_name).text
+                print(product_name)
+                # 产品简称和产品名称加入列表
+                data_item_product.extend([product_name, product_name])
+                # 销售公司名称加入明细的列表
+                data_item_product.append('Amazon Web Services, Inc.')
+                # 加入3个空格到明细的列表
+                data_item_product.extend(['', '', ''])
 
-                        # 扣税之前的金额，税额，明细最终金额 加入列表
-                        # 海外账号 税额都是0，所以扣税之前金额和明细最终金额相同
-                        data_item_final.extend(['', '', '', '', '', str(detail_fee), '', '0', '', str(detail_fee)])
-                        # 从aws原始的csv文件中匹配account 和 item description，取 Usage Start Date的值，页面上没有
-                        rows = read_aws_csv()
-                        # print(f'aws 原始的csv文件中数据行数（不算表头）：{len(rows)}')
-                        for row in rows:
-                            # print('匹配aws的csv文件中的item description，获取Usage Start Date的值')
-                            # aws的csv中item description文本内容中间可能会多空格，连续两个空格，正则将多个空格替换为一个
-                            # 如果aws中有重复的项，那么取第一匹配到的值
-                            # 目前还存在匹配不上的值，由姜玲手动处理 -> 不手动处理了，改为取：BillingPeriodStartDate、BillingPeriodEndDate
-                            item_description_aws = re.sub(' +', '', row[18])
-                            item_description_page = re.sub(' +', '', data_item_final[18])
-                            if row[2] == data_item_final[2] and item_description_aws == item_description_page:
-                                data_item_final[0] = row[0]
-                                data_item_final[19] = row[19]
-                                data_item_final[20] = row[20]
-                        if data_item_final[19] == '':
-                            data_item_final[19] = data_item_final[5]
-                            data_item_final[20] = data_item_final[6]
-                        # 明细内容写入csv
-                        write_csv(data_item_final)
-                        # print(data_item_final)
+                # 当前产品下区域的列表
+                path_regions = f'{path_products}[{j + 1}]/awsui-expandable-section/div/span/div[@ng-if="vm.shouldShowProducts(product)"]'
+                regions = driver.find_elements(by=path_xpath, value=path_regions)
+                print(f'第 {j} 个产品下有 {len(regions)} 个 region元素')
+                for m in range(1, len(regions) + 1):
+                    region = regions[m - 1]
+                    ele_scroll_to_view(driver, region)
+                    # sleep(0.5)
+                    # 获取region的名称
+                    path_region_name = f'{path_regions}[{m}]/awsui-expandable-section/h3'
+                    region_name = driver.find_element(by=path_xpath, value=path_region_name).text
+                    print(f'第 {m} 个 region name is {region_name}')
+                    # 获取regin的费用
+                    path_region_fee = f'{path_regions}[{m}]/span'
+                    # region_fee = driver.find_element(by=path_xpath, value=path_region_fee).text.replace('$', '')
+                    region_fee = re.sub(r'[$,]*', '', driver.find_element(by=path_xpath, value=path_region_fee).text)
+                    # 账号合计费用
+                    account_fee_total = account_fee_total + decimal.Decimal(region_fee)
+                    print(f'第 {m} 个 region fee is {region_fee}')
+                    # 展开区域下明细类型
+                    region.click()
+                    # sleep(1)
+                    path_detail_types = f'{path_region_name}/../div/span/div/div'
+                    detail_types = driver.find_elements(by=path_xpath, value=path_detail_types)
+                    # print(f'{len(detail_types)} types of details')
+                    for n in range(1, len(detail_types) + 1):
+                        detail_type = detail_types[n - 1]
+                        ele_scroll_to_view(driver, detail_type)
+                        # sleep(0.5)
+                        # 用量详情的路径
+                        path_details = f'{path_detail_types}[{n}]/div'
+                        details = driver.find_elements(by=path_xpath, value=path_details)
+                        # print(f'第 {n} 个类型下有{len(details) - 1}条明细')
+                        for r in range(1, len(details)):
+                            data_item_final = []
+                            data_item_final.extend(data_item_product)
+                            path_detail_item = f'{path_details}[{r + 1}]/div[1]'
+                            path_detail_fee = f'{path_details}[{r + 1}]/div[3]'
+                            detail_item = driver.find_element(by=path_xpath, value=path_detail_item)
+                            # 元素移动到可视区域
+                            ele_scroll_to_view(driver, detail_item)
+                            detail_item_text = detail_item.text
+                            # print(f'detail is: {detail_item_text}')
+                            # 明细的描述加入列表
+                            data_item_final.append(detail_item_text)
+                            # 明细金额的文本
+                            detail_fee = re.sub(r'[$,]*', '',
+                                                driver.find_element(by=path_xpath, value=path_detail_fee).text)
+                            # 明细金额的数字
+                            # detail_fee_num = float(detail_fee)
+                            all_detail_total = all_detail_total + decimal.Decimal(detail_fee)
+
+                            # 扣税之前的金额，税额，明细最终金额 加入列表
+                            # 海外账号 税额都是0，所以扣税之前金额和明细最终金额相同
+                            data_item_final.extend(['', '', '', '', '', str(detail_fee), '', '0', '', str(detail_fee)])
+                            # 从aws原始的csv文件中匹配account 和 item description，取 Usage Start Date的值，页面上没有
+                            rows = read_aws_csv()
+                            # print(f'aws 原始的csv文件中数据行数（不算表头）：{len(rows)}')
+                            for row in rows:
+                                # print('匹配aws的csv文件中的item description，获取Usage Start Date的值')
+                                # aws的csv中item description文本内容中间可能会多空格，连续两个空格，正则将多个空格替换为一个
+                                # 如果aws中有重复的项，那么取第一匹配到的值
+                                # 目前还存在匹配不上的值，由姜玲手动处理 -> 不手动处理了，改为取：BillingPeriodStartDate、BillingPeriodEndDate
+                                item_description_aws = re.sub(' +', '', row[18])
+                                item_description_page = re.sub(' +', '', data_item_final[18])
+                                if row[2] == data_item_final[2] and item_description_aws == item_description_page:
+                                    data_item_final[0] = row[0]
+                                    data_item_final[19] = row[19]
+                                    data_item_final[20] = row[20]
+                            if data_item_final[19] == '':
+                                data_item_final[19] = data_item_final[5]
+                                data_item_final[20] = data_item_final[6]
+                            # 明细内容写入csv
+                            write_csv(data_item_final)
+                            # print(data_item_final)
+
         # 账号合计的费用加入列表
         data_account_total.append(str(account_fee_total))
         all_account_total = all_account_total + account_fee_total
