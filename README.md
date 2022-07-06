@@ -1,3 +1,14 @@
+#### 打包exe的命令
+
+`pyinstaller  -n awsBilling -i favicon.ico -p E:\Code\Python\awsBilling\venv\Lib\site-packages -F -c main.py`
+
+- -n 指定exe名称
+- -i 指定exe的icon图标
+- -p 指定本地导入的包的路径（没有自动打包脚本里导入的第三方包，所以只能手动自定路径）
+- -F 打包为一个单独的exe文件
+- -c exe运行时显示命令行窗口
+- main.py 要打包的脚本文件
+
 ##### 部署准备(只需要配置一次)
 1. 在本地创建一个文件夹用来放置脚本（awsBill.exe）和配置文件(config.json)
 2. 查看本地chrome浏览器的版本和用户配置文件夹目录

@@ -1,5 +1,6 @@
 # coding:utf-8
 import decimal
+# import selenium
 from selenium import webdriver
 # from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -184,6 +185,13 @@ def get_page_data(driver):
                    ]
     write_new_csv(header_line)
 
+    # 代付账号的id 以前是写死的，现在根据当前登录的账号自己去取
+    path_menu = r'//*[@id="nav-usernameMenu"]/span[1]/span[1]'
+    driver.find_element(by=path_xpath, value=path_menu).click()
+    path_payer_account = r'//*[@id="menu--account"]/div[1]/div/div/span[2]'
+    sinnet_account = driver.find_element(by=path_xpath, value=path_payer_account).text.replace('-', '')
+    print(f'pay account: {sinnet_account}')
+
     # 整个账户模块下的div列表（包含标题和账户列表）
     path_accounts = '//*[@id="bills-page-antelope"]/div[6]/div/div/div/div[1]/div[2]/awsui-tabs/div/div/div/span/div[2]/div/div/div/div'
     # 获取当前账号下子账号元素的列表
@@ -191,8 +199,9 @@ def get_page_data(driver):
     print(f'账号列表模块有 {len(accounts) - 1} 个 账号')
     # 遍历页面上账号的列表，并逐个点击展开，以拉取账号下的账单列表
     # 从第2个 div 开始是账号，第一个是列表的标题
+
     for i in range(1, len(accounts)):
-        sinnet_account = '605989878643'
+        # sinnet_account = '605989878643'
         record_type_item = 'LinkedLineItem'
         record_type_total = 'AccountTotal'
         # 写入csv的数据
@@ -249,9 +258,9 @@ def get_page_data(driver):
             # 遍历账号下产品列表
             # 从第二个div开始，第一个div是标题
             # path_products = f'//*[@id="bills-page-antelope"]/div[6]/div/div/div/div[1]/div[2]/awsui-tabs/div/div/div/span/div[2]/div/div/div/div[{i + 1}]/awsui-expandable-section/div/span/div/div/div/div'
-            path_products = f'{path_fei_type}[{k+1}]/div'
+            path_products = f'{path_fei_type}[{k + 1}]/div'
             products = driver.find_elements(by=path_xpath, value=path_products)
-            print(f'第 {k+1} 个费用类型下有 {len(products) - 1} 个 产品元素')
+            print(f'第 {k + 1} 个费用类型下有 {len(products) - 1} 个 产品元素')
             for j in range(1, len(products)):
                 print(f'第{j}个产品')
                 data_item_product = []
